@@ -24,8 +24,9 @@ llmbundle [OPTIONS] [patterns]...
 
 ### Options
 
-- `<patterns>`: One or more glob patterns to match files. Patterns without a directory separator are treated as matching
-  any file with that name (e.g., `main.rs` is normalized to `**/main.rs`).
+- `[patterns]`: Glob patterns to match files. Patterns without a directory separator are treated as matching
+  any file with that name (e.g., `main.rs` is normalized to `**/main.rs`). If no glob patterns are specified,
+  every file (that is not in `.gitignore`, if it exists) under the root will be matched.
 - `--root <root>`: Root directory for file search (default: `.`).
 - `--max-depth <max_depth>`: Maximum directory depth to traverse.
 - `--output <OUTPUT>`: Output destination; either `stdout` or `clipboard` (default: clipboard).
@@ -33,7 +34,7 @@ llmbundle [OPTIONS] [patterns]...
 
 ### Examples
 
-Search for all files in the current directory (files in `.gitignore` are ignored):
+Search for all files in the current directory (files in `.gitignore` are ignored automatically):
 
 ```shell
 llmbundle
