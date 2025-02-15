@@ -96,6 +96,12 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+const FORMAT: &str = r#"[file name]: {file_name}
+[file content begin]
+{file_content}
+[file content end]
+"#;
+
 fn process_file(path: &Path, verbose: bool) -> String {
     if verbose {
         eprintln!("Reading file: {}", path.display());
@@ -108,14 +114,9 @@ fn process_file(path: &Path, verbose: bool) -> String {
             String::new()
         });
 
-    let header = format!(
-        "{}\nFile: {}\n{}\n",
-        "=".repeat(50),
-        path.display(),
-        "=".repeat(50)
-    );
-
-    format!("{}\n{}", header, content)
+    FORMAT
+        .replace("{file_name}", path.display().to_string().as_str())
+        .replace("{file_content}", &content)
 }
 
 fn normalize_pattern(pattern: &str) -> String {
@@ -161,7 +162,7 @@ fn build_glob_sets(patterns: &[String]) -> Result<(GlobSet, GlobSet)> {
     }
 
     if pos_builder_is_empty {
-        pos.add(Glob::new("**").unwrap());
+        pos.add(Glob::new("**").expect("** is valid pattern"));
     }
 
     let pos_set = pos.build().context("Failed to build positive glob set")?;
