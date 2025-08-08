@@ -5,7 +5,7 @@ use colored::Colorize;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use ignore::WalkBuilder;
 use rayon::prelude::*;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
@@ -72,17 +72,17 @@ fn main() -> Result<()> {
         eprintln!("Total matching files: {}", matching_files.len());
     }
 
-    let file_outputs: Vec<String> = matching_files
+    let file_outputs: (Vec<String>, Vec<ProcessedFile>) = matching_files
         .par_iter()
         .map(|path| process_file(path, args.verbose))
         .collect();
 
-    let output_buffer = file_outputs.join("\n");
+    let output_buffer = file_outputs.0.join("\n");
 
     match args.output {
         Output::Stdout => println!("{}", output_buffer),
         Output::Clipboard => {
-            print_summary(&matching_files, &output_buffer);
+            print_summary(file_outputs.1, &output_buffer);
             Clipboard::new()
                 .context("Failed to initialize clipboard")?
                 .set_text(output_buffer)
@@ -102,7 +102,14 @@ const FORMAT: &str = r#"[file name]: {file_name}
 [file content end]
 "#;
 
-fn process_file(path: &Path, verbose: bool) -> String {
+struct ProcessedFile {
+    path: PathBuf,
+    line_count: usize,
+    word_count: usize,
+    char_count: usize,
+}
+
+fn process_file(path: &Path, verbose: bool) -> (String, ProcessedFile) {
     if verbose {
         eprintln!("Reading file: {}", path.display());
     }
@@ -114,9 +121,22 @@ fn process_file(path: &Path, verbose: bool) -> String {
             String::new()
         });
 
-    FORMAT
+    let content = FORMAT
         .replace("{file_name}", path.display().to_string().as_str())
-        .replace("{file_content}", &content)
+        .replace("{file_content}", &content);
+
+    let line_count = content.lines().count();
+    let word_count = content.split_whitespace().count();
+    let char_count = content.chars().count();
+
+    let processed_file = ProcessedFile {
+        path: path.to_path_buf(),
+        line_count,
+        word_count,
+        char_count,
+    };
+
+    (content, processed_file)
 }
 
 fn normalize_pattern(pattern: &str) -> String {
@@ -171,14 +191,23 @@ fn build_glob_sets(patterns: &[String]) -> Result<(GlobSet, GlobSet)> {
     Ok((pos_set, neg_set))
 }
 
-fn print_summary(matching_files: &[std::path::PathBuf], buffer: &str) {
+fn print_summary(mut matching_files: Vec<ProcessedFile>, buffer: &str) {
     println!("{}", "Files matched".blue().bold());
     if matching_files.is_empty() {
         println!("{}", "No files matched.".red());
         return;
     }
-    for file in matching_files {
-        println!("{} {}", "+".red(), file.display());
+
+    matching_files.sort_by_key(|v| v.line_count);
+
+    for file in &matching_files {
+        let file_info = format!(
+            "({} lines, {} words, {} characters)",
+            file.line_count, file.word_count, file.char_count
+        )
+        .black();
+
+        println!("{} {} {file_info}", "+".red(), file.path.display());
     }
 
     println!(
